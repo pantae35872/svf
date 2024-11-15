@@ -1,0 +1,15 @@
+{
+  "appId": "io.github.pantae35872.svf",
+  "files": ["dist-electron", "dist-vue"],
+  "icon": "./icon.png",
+  "mac": { 
+    "target": "dmg"
+  },
+  "linux": {
+    "target": "AppImage",
+    "category": "Utility"
+  },
+  "win": {
+    "target": ["portable", "msi"]
+  }
+}
