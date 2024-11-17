@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { isDev } from './util.js';
+import { createServer } from 'http-server';
+
 
 app.on("ready", () => {
   const mainWindow = new BrowserWindow({});
@@ -8,6 +10,14 @@ app.on("ready", () => {
   if (isDev()) {
     mainWindow.loadURL('http://localhost:5123');
   } else { 
-    mainWindow.loadFile(path.join(app.getAppPath(), '/dist-vue/index.html'));
+    const serverPath = path.join(app.getAppPath(), 'dist-vue');
+    let server = createServer({ root: serverPath });
+    server.listen(3000, () => {
+      mainWindow.loadURL("http://localhost:3000");
+    })
+
+    app.on('will-quit', () => {
+      server.close();
+    });
   }
 });

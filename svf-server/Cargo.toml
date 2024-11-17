@@ -4,3 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.93"
+sqlite = "0.36.1"
+[dependencies.serde]
+version = "1.0.215"
+features = ["serde_derive", "derive"]
+
+[dependencies.axum-extra]
+version = "0.9.4"
+features = ["tracing", "cookie", "typed-header"]
+
+[dependencies.axum]
+version = "0.7.7"
+
+[dependencies.tokio]
+version = "1.41.1"
+features = ["full"]

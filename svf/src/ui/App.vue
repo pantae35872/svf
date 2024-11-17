@@ -1,22 +1,54 @@
-<script setup lang="ts">
-//import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
-  <h1>SVF</h1>
+  <div>
+    <router-view></router-view>
+  </div>
 </template>
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+<script lang="ts">
+const color_vars = ['--bg-color', '--fg-color', '--bg-color-4', '--bg-color-2',
+'--bg-color-3', '--fg-color-2'];
+export default {
+  data() {
+    return {
+      colorScheme: 'light',
+    }
+  },
+  mounted() {
+    const savedColorScheme = window.localStorage.getItem('colorScheme');
+    if (savedColorScheme) {
+      this.colorScheme = savedColorScheme;
+      this.updateCssVariables();
+    } else {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      this.colorScheme = mediaQuery.matches ? 'dark' : 'light';
+      mediaQuery.addEventListener('change', (event) => {
+        this.colorScheme = event.matches ? 'dark' : 'light'; 
+      });
+      this.updateCssVariables();
+    }
+  },
+  watch: {
+    colorScheme() {
+      this.updateCssVariables();
+    }
+  },
+  methods: {
+    toggleColorScheme() {
+      this.colorScheme = this.colorScheme == 'dark' ? 'light' : 'dark';
+      window.localStorage.setItem('colorScheme', this.colorScheme);
+    },
+    updateCssVariables() {
+      const root = document.documentElement;
+      if (this.colorScheme === 'dark') {
+        color_vars.forEach((color_var) => {
+          root.style.setProperty(color_var, `var(${color_var}-dark)`);
+        })
+      } else {
+        color_vars.forEach((color_var) => {
+          root.style.setProperty(color_var, `var(${color_var}-light)`);
+        })
+      }
+    }
+  }
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
-</style>
+</script>
