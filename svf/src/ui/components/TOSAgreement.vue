@@ -2,7 +2,7 @@
   <div>
     <input type="checkbox" id="agreeToPolicies" name="agreeToPolicies" value="yes" required>
     <label for="agreeToPolicies">
-        I have read and agree to the <a href="/term-of-service" target="_blank" class="link">Terms of Service</a> and <a href="/privacy" target="_blank" class="link">Privacy Policy</a>.
+      I have read and agree to the <router-link to="/term-of-service" class="link">Terms of Service</router-link> and <router-link to="/privacy" class="link">Privacy Policy</router-link>.
     </label>
   </div>
 </template>
@@ -56,6 +56,12 @@ input[type="checkbox"]:checked + label::after {
     left: 5px;
     font-size: 1rem;
     color: var(--fg-color);
+}
+
+@media (width <= 600px) {
+  input[type="checkbox"]:checked + label::after {
+    top: 0%;
+  }
 }
 
 label {
