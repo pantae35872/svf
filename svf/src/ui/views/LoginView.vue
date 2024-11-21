@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { CallbackTypes } from 'vue3-google-login';
 import AppNavBar from '../components/AppNavBar.vue';
-import { VueCookies } from 'vue-cookies';
-import { inject } from 'vue';
 import GoogleButton from '../components/GoogleButton.vue';
 import Seperator from '../components/Seperator.vue';
 import FormContainer from '../components/FormContainer.vue';

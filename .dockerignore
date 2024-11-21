@@ -1,0 +1,5 @@
+svf-server/target/debug
+svf-server/target/release/deps
+svf-server/target/release/build
+strawberry-server/venv
+svf/node_modules
