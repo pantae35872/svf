@@ -48,6 +48,7 @@ input {
   outline: none;
   border-radius: 0.31rem;
   border: 1px solid var(--fg-color);
+  background-color: var(--bg-color);
   padding: 0 1.25rem 0 3.12rem;
   font-size: 1.06rem;
   transition: 0.2s ease;

@@ -12,6 +12,7 @@
 </template>
 
 <style scoped>
+
 .login-container {
   width: 100%;
   max-width: 600px;

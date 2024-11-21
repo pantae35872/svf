@@ -5,7 +5,18 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.93"
+axum-server = { version = "0.7.1", features = ["tls-rustls"]}
+dotenv = "0.15.0"
+futures = "0.3.31"
+local-ip-address = "0.6.3"
+rand = "0.8.5"
+regex = "1.11.1"
+reqwest = "0.12.9"
 sqlite = "0.36.1"
+tokio-postgres = "0.7.12"
+tower = "0.5.1"
+tower-http = { version = "0.6.1", features= ["cors"]}
+
 [dependencies.serde]
 version = "1.0.215"
 features = ["serde_derive", "derive"]

@@ -5,8 +5,16 @@ import router from './router';
 import vue3GoogleLogin from 'vue3-google-login';
 import VueCookies from 'vue-cookies';
 
-createApp(App).use(router).use(vue3GoogleLogin, {
+
+const app = createApp(App);
+
+app.config.globalProperties.$server = process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:3000' : 'https://svf-backend.duckdns.org';
+
+app.use(router);
+app.use(vue3GoogleLogin, {
   clientId: '606126667998-c7vdmtohcqbvegnksl78a8htrogc9si3.apps.googleusercontent.com'
-}).use(VueCookies, {
+});
+app.use(VueCookies, {
   expires: '7d',
-}).mount('#app')
+});
+app.mount('#app');

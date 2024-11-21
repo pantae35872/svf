@@ -11,17 +11,8 @@ import InputField from '../components/InputField.vue';
 import UserIcon from '../assets/user.svg';
 import PasswordIcon from '../assets/password.svg';
 import FormButton from '../components/FormButton.vue';
-
-const $cookies = inject<VueCookies>('$cookies');
-const handleGoogleLogin = async (response: CallbackTypes.TokenPopupResponse) => {
-  const result = await fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${response.access_token}`);
-  const {
-    email,
-  } = await result.json();
-  console.log(email);
-  $cookies?.set("googleToken", response.access_token);
-}
-
+import router from '../router';
+import Swal from 'sweetalert2';
 </script>
 
 <script lang="ts">
@@ -36,6 +27,33 @@ export default {
     handleUsernameLogin() {
       console.log(this.username);
       console.log(this.password);
+    },
+    async handleGoogleLogin(response: CallbackTypes.TokenPopupResponse) {
+      const res = await fetch(`${this.$server}/login/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          google_access_token: response.access_token,
+        }),
+        credentials: 'include',
+      });
+      const result: "Ok" | { Error: string } = await res.json();
+      if (result == "Ok") {
+        router.push({ path: "/app"});
+      } else {
+        Swal.fire({ 
+          title: "Error",
+          icon: 'error',
+          color: "var(--fg-color)",
+          text: result.Error,
+          background: "var(--bg-color-4)",
+          customClass: {
+            confirmButton: 'confirm-button-style',
+          },
+        });
+      }
     }
   },
 }

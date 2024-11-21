@@ -28,6 +28,11 @@
   --bg-color-4-light: #f8d0d0; /* Subtle background - light peachy-pink */
 }
 
+.alert-input-style {
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+}
+
 body {
   color: var(--fg-color);
   background-color: var(--bg-color);
