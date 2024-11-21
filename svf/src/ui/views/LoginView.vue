@@ -11,6 +11,10 @@ import PasswordIcon from '../assets/password.svg';
 import FormButton from '../components/FormButton.vue';
 import router from '../router';
 import Swal from 'sweetalert2';
+import { inject } from 'vue';
+import { VueCookies } from 'vue-cookies';
+
+inject<VueCookies>('$cookies');
 </script>
 
 <script lang="ts">
@@ -37,8 +41,9 @@ export default {
         }),
         credentials: 'include',
       });
-      const result: "Ok" | { Error: string } = await res.json();
-      if (result == "Ok") {
+      const result: { AccessToken: string } | { Error: string } = await res.json();
+      if ("AccessToken" in result) {
+        this.$cookies.set("accessToken", result.AccessToken);
         router.push({ path: "/app"});
       } else {
         Swal.fire({ 
