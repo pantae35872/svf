@@ -11,6 +11,7 @@ use crate::{is_production, wait_pool::WaitPool, ServiceHandles};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BackendResponse {
     Ok,
+    AccessToken(String),
     Error(String),
 }
 

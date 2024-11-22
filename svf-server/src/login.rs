@@ -44,7 +44,6 @@ pub async fn google(
     State(services): State<Arc<ServiceHandles>>,
     Json(data): Json<GoogleLogin>,
 ) -> impl IntoResponse {
-    let mut headers = HeaderMap::new();
     let access_token = match match services
         .auth_service
         .request(AuthenticationServiceRequest::GoogleLogin {
@@ -53,20 +52,17 @@ pub async fn google(
         .await
     {
         Ok(access_token) => access_token,
-        Err(err) => return (err.clone().into(), headers, err.into()),
+        Err(err) => return (err.clone().into(), err.into()),
     } {
         AuthenticationServiceResponse::AccessToken(token) => token,
         _ => unreachable!(),
     };
-    headers.insert(
-        SET_COOKIE,
-        HeaderValue::from_str(&format!(
-            "accessToken={}; SameSite=None; Secure; Partitioned",
-            access_token.iter().collect::<String>()
-        ))
-        .unwrap(),
-    );
-    (StatusCode::OK, headers, Json(BackendResponse::Ok))
+    (
+        StatusCode::OK,
+        Json(BackendResponse::AccessToken(
+            access_token.iter().collect::<String>(),
+        )),
+    )
 }
 
 pub async fn username(Json(data): Json<UsernameLogin>) -> impl IntoResponse {
