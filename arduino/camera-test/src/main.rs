@@ -1,5 +1,5 @@
 use std::{
-    fs::{remove_file, File},
+    fs::{remove_file, File, OpenOptions},
     io::{Read, Write},
     net::TcpListener,
     path::Path,
@@ -26,7 +26,13 @@ fn main() {
                 println!("{reads}");
             }
 
-            let mut file = File::create("img.jpg").unwrap();
+            let mut file = OpenOptions::new()
+                .write(true) // Enable writing
+                .create(true) // Create the file if it doesn't exist
+                .truncate(true) // Truncate the file if it exists
+                .open("img.jpg")
+                .unwrap();
+
             file.write_all(&buffer).unwrap();
             println!("Image get successfully");
         }
