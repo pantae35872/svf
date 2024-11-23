@@ -1,13 +1,13 @@
 #include <WiFi.h>
 
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
+const char* ssid = "TINN_2.4G";
+const char* password = "0635415591";
 
 WiFiClient client;
 
 void setup() {
   // put your setup code here, to run once:
-  Serial1.begin(115200);
+  Serial1.begin(57600);
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -36,11 +36,11 @@ void loop() {
                  (uint32_t)length_byte[2] << 8 |
                  (uint32_t)length_byte[3];
   size_t wrotes = 0;
-  size_t write_count = 1024;
+  size_t write_count = 128;
   if (readed > 0 && length > 0 && client.connect("192.168.1.123", 4000)) {
     client.write(length_byte, 4);
     while (wrotes < length) {
-      if (length - wrotes < 1024) {
+      if (length - wrotes < 128) {
         write_count = length - wrotes;
       } 
       uint8_t *buffer = (uint8_t*)calloc(0, write_count);

@@ -23,7 +23,7 @@
 void setup() {
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(57600);
   Serial.setDebugOutput(false);
 
   camera_config_t config;
@@ -47,16 +47,9 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG; 
-  
-  if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA;
-    config.jpeg_quality = 10;
-    config.fb_count = 2;
-  } else {
-    config.frame_size = FRAMESIZE_SVGA;
-    config.jpeg_quality = 12;
-    config.fb_count = 1;
-  }
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 12;
+  config.fb_count = 1;
 
   esp_camera_init(&config);
 }
@@ -72,23 +65,25 @@ void loop() {
     magic_bytes[2] = (magic >> 8) & 0xFF;
     magic_bytes[3] = magic & 0xFF;
     Serial.write(magic_bytes, 4);
-    size_t jpg_buf_len = 0;
-    uint8_t *jpg_buf = NULL;
-    frame2jpg(fb, 80, &jpg_buf, &jpg_buf_len);
+    size_t length = fb->len;
     uint8_t length_bytes[4];
-    length_bytes[0] = (jpg_buf_len >> 24) & 0xFF;
-    length_bytes[1] = (jpg_buf_len >> 16) & 0xFF;
-    length_bytes[2] = (jpg_buf_len >> 8) & 0xFF;
-    length_bytes[3] = jpg_buf_len & 0xFF;
+    uint8_t *jpg_buf = NULL;
+    size_t jpg_len = 0;
+    frame2jpg(fb, 12, &jpg_buf, &jpg_len);
+    length_bytes[0] = (jpg_len >> 24) & 0xFF;
+    length_bytes[1] = (jpg_len >> 16) & 0xFF;
+    length_bytes[2] = (jpg_len >> 8) & 0xFF;
+    length_bytes[3] = jpg_len & 0xFF;
     Serial.write(length_bytes, 4);
     size_t write_pos = 0;
-    size_t write_count = 1024;
-    while (write_pos < jpg_buf_len) {
-      if (jpg_buf_len - write_pos < 1024) {
-        write_count = jpg_buf_len - write_pos;
+    size_t write_count = 128;
+    while (write_pos < jpg_len) {
+      if (jpg_len - write_pos < 128) {
+        write_count = jpg_len - write_pos;
       }
       size_t wrote = Serial.write(jpg_buf+write_pos, write_count);
       write_pos += wrote;
+      delay(1);
     }
     esp_camera_fb_return(fb);
     free(jpg_buf);
