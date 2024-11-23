@@ -7,6 +7,7 @@ use tokio::{
 
 pub mod authentication_service;
 pub mod db_service;
+pub mod farm_service;
 
 pub fn serve_service<T, D, R>(mut service: T) -> JoinHandle<()>
 where

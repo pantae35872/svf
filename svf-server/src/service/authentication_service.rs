@@ -1,7 +1,6 @@
 use axum::Json;
 use regex::Regex;
 use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::{utils::get_google_info, web_server::BackendResponse};
