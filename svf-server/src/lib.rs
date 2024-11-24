@@ -13,7 +13,7 @@ use reqwest::{
 use service::{
     authentication_service::{AuthenticationService, AuthenticationServiceHandle},
     db_service::{DBService, DBServiceHandle},
-    serve_service, Service,
+    farm_service, serve_service, Service,
 };
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -52,6 +52,7 @@ pub fn build_cors() -> CorsLayer {
 pub struct ServiceHandles {
     pub db_service: DBServiceHandle,
     pub auth_service: AuthenticationServiceHandle,
+    pub farm_service: farm_service::ServiceHandle,
 }
 
 pub fn router() -> Router<Arc<ServiceHandles>> {
@@ -75,11 +76,14 @@ async fn notfound_handler() -> impl IntoResponse {
 pub async fn init_services(wait_pool: &mut WaitPool) -> ServiceHandles {
     let db_service = DBService::new().await;
     let auth_service = AuthenticationService::new(db_service.get());
+    let farm_service = farm_service::Service::new(db_service.get());
     let handles = ServiceHandles {
         db_service: db_service.get(),
         auth_service: auth_service.get(),
+        farm_service: farm_service.get(),
     };
     wait_pool.add(serve_service(db_service));
     wait_pool.add(serve_service(auth_service));
+    wait_pool.add(serve_service(farm_service));
     handles
 }

@@ -54,10 +54,13 @@ impl Client {
         self.stream.read(&mut buffer).await.unwrap();
         let packet = Packet::<ClientPacketId>::new(header.id(), &mut buffer).unwrap();
         match packet.decode().unwrap() {
-            ClientPacket::RequestId => {
+            ClientPacket::RequestId { region } => {
                 let (id_sender, mut id_receiver) = channel::<[char; 64]>(16);
                 self.client_sender
-                    .send(ClientReceiverCommand::RequestId(id_sender))
+                    .send(ClientReceiverCommand::RequestId {
+                        callback: id_sender,
+                        region,
+                    })
                     .await
                     .unwrap();
                 match id_receiver.recv().await {
@@ -192,12 +195,20 @@ fn decode_frame(mut buffer: BufferReader) -> Result<ClientPacket, PacketError> {
     })
 }
 
+fn decode_request_id(mut buffer: BufferReader) -> Result<ClientPacket, PacketError> {
+    Ok(ClientPacket::RequestId {
+        region: buffer
+            .read_string()
+            .ok_or(PacketError::InvalidPacketLength)?,
+    })
+}
+
 impl From<&ClientPacket> for ClientPacketId {
     fn from(value: &ClientPacket) -> Self {
         match value {
             ClientPacket::ReportSensors { .. } => Self::ReportSensors,
             ClientPacket::ImageFrame { .. } => Self::ImageFrame,
-            ClientPacket::RequestId => Self::RequestId,
+            ClientPacket::RequestId { .. } => Self::RequestId,
             ClientPacket::ReportId { .. } => Self::ReportId,
         }
     }
@@ -209,7 +220,7 @@ impl PacketId for ClientPacketId {
     fn decode(&self, buffer: BufferReader) -> Result<ClientPacket, PacketError> {
         match self {
             Self::ReportId => decode_report_id(buffer),
-            Self::RequestId => Ok(ClientPacket::RequestId),
+            Self::RequestId => decode_request_id(buffer),
             Self::ReportSensors => decode_sensors(buffer),
             Self::ImageFrame => decode_frame(buffer),
         }

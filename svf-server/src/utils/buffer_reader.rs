@@ -68,6 +68,12 @@ impl<'a> BufferReader<'a> {
         }));
     }
 
+    pub fn read_string(&mut self) -> Option<String> {
+        let length = self.read_u32()?;
+        let data = self.read_bytes(length as usize)?;
+        return Some(String::from_utf8(data.to_vec()).ok()?);
+    }
+
     pub fn read_u64(&mut self) -> Option<u64> {
         let u64_bytes = match self.read_bytes(8) {
             Some(bytes) => bytes,

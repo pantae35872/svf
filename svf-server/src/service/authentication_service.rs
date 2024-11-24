@@ -58,6 +58,7 @@ pub enum AuthenticationServiceError {
     InvalidAccessToken,
     AuthenticationMismatch,
     UnregisteredAccount,
+    UnregisteredDevice,
     UsernameTaken,
     GoogleTaken,
     WrongPassword,
@@ -68,6 +69,7 @@ impl Into<Json<BackendResponse>> for AuthenticationServiceError {
         Json(BackendResponse::Error(
             match self {
                 Self::UnregisteredAccount => "Trying to login into unregistered account.",
+                Self::UnregisteredDevice => "Trying to access into unregistered devices.",
                 Self::InvalidUsernameRegex => "Username can only contain lowercase and uppercase English letters, as well as the characters '-' and '_'.",
                 Self::InvalidUsernameLength => "Username length can only be in the range of 3 to 20 characters.",
                 Self::InvalidGoogleToken => "Invalid Google Token",
@@ -95,7 +97,8 @@ impl Into<StatusCode> for AuthenticationServiceError {
             | Self::InvalidUsernameLength
             | Self::GoogleTaken
             | Self::AuthenticationMismatch
-            | Self::WrongPassword => StatusCode::BAD_REQUEST,
+            | Self::WrongPassword
+            | Self::UnregisteredDevice => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -107,6 +110,7 @@ impl From<DBServiceError> for AuthenticationServiceError {
             DBServiceError::UserAlreadyExists => Self::UsernameTaken,
             DBServiceError::GoogleTaken => Self::GoogleTaken,
             DBServiceError::AuthenticationMismatch => Self::AuthenticationMismatch,
+            DBServiceError::UnregisterdDevice => Self::UnregisteredDevice,
         }
     }
 }

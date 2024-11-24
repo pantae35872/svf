@@ -32,6 +32,12 @@ pub enum DBServiceRequest {
     ConsumePasswordWithChallenge {
         username: String,
     },
+    CreateNewDevice {
+        region: String,
+    },
+    GetTemperature {
+        id: [char; 64],
+    },
     CreateUserGoogle {
         username: String,
         google_id: String,
@@ -44,8 +50,10 @@ pub enum DBServiceRequest {
     },
 }
 
+#[derive(Debug)]
 pub enum DBServiceError {
     UnregisterdAccount,
+    UnregisterdDevice,
     UserAlreadyExists,
     GoogleTaken,
     AuthenticationMismatch,
@@ -55,6 +63,8 @@ pub enum DBServiceResponse {
     Empty,
     AccessToken([char; 128]),
     PasswordHashWithChallenge([char; 64]),
+    DeviceId([char; 64]),
+    Temperature(i32),
 }
 
 impl DBService {
@@ -269,6 +279,54 @@ WHERE username = $2::TEXT",
         return Ok(DBServiceResponse::Empty);
     }
 
+    async fn create_device(&mut self, region: String) -> Result<DBServiceResponse, DBServiceError> {
+        let id = TryInto::<[char; 64]>::try_into({
+            let mut rng = rand::thread_rng();
+            (0..64)
+                .map(|_| rng.sample(Alphanumeric))
+                .map(char::from)
+                .collect::<Vec<char>>()
+        })
+        .unwrap();
+        self.client
+            .query(
+                "
+                WITH temp AS (
+                  SELECT temperature 
+                  FROM region_temp 
+                  WHERE region = $1::TEXT 
+                ) INSERT INTO farms (farm_id, ripe, unripe, temperature) 
+                SELECT $2::TEXT, 0, 0, temperature 
+                FROM temp
+            ",
+                &[&region, &id.iter().collect::<String>()],
+            )
+            .await
+            .unwrap();
+        return Ok(DBServiceResponse::DeviceId(id));
+    }
+
+    async fn get_temperature(
+        &mut self,
+        id: [char; 64],
+    ) -> Result<DBServiceResponse, DBServiceError> {
+        let data = self
+            .client
+            .query(
+                "SELECT temperature FROM farms WHERE farm_id = $1::TEXT",
+                &[&id.iter().collect::<String>()],
+            )
+            .await
+            .unwrap();
+        if let Some(user) = data.get(0) {
+            return Ok(DBServiceResponse::Temperature(
+                user.get::<_, i32>("temperature"),
+            ));
+        }
+
+        return Err(DBServiceError::UnregisterdDevice);
+    }
+
     async fn create_user_default(
         &mut self,
         username: String,
@@ -336,6 +394,8 @@ impl Service<DBServiceRequest, Result<DBServiceResponse, DBServiceError>> for DB
             DBServiceRequest::CreateAccessTokenUsername { username } => {
                 self.create_access_token_username(username).await
             }
+            DBServiceRequest::GetTemperature { id } => self.get_temperature(id).await,
+            DBServiceRequest::CreateNewDevice { region } => self.create_device(region).await,
         }
     }
 }

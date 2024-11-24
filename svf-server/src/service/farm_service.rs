@@ -1,6 +1,8 @@
 use std::{collections::HashMap, fs::read_dir, net::SocketAddr, sync::Arc};
 
-use super::db_service::DBServiceHandle;
+use crate::service::db_service::DBServiceResponse;
+
+use super::db_service::{DBServiceHandle, DBServiceRequest};
 use client::{Client, ClientPacketId};
 use futures::FutureExt;
 use local_ip_address::local_ip;
@@ -24,11 +26,16 @@ pub type ServiceHandle =
 
 type ServiceChannel = super::ServiceRequest<ServiceRequest, Result<ServiceResponse, ServiceError>>;
 
+struct ServerClient {
+    target_temperature: i32,
+    sender: Sender<ServerPacket>,
+}
+
 pub struct Service {
     sender: Sender<ServiceChannel>,
     receiver: Receiver<ServiceChannel>,
     db: DBServiceHandle,
-    clients: HashMap<[char; 64], Sender<ServerPacket>>,
+    clients: HashMap<[char; 64], ServerClient>,
 }
 
 pub enum ServiceRequest {
@@ -36,8 +43,10 @@ pub enum ServiceRequest {
         access_token: [char; 128],
         device_id: [char; 64],
     },
+    ReceiverCommand(ClientReceiverCommand),
 }
 
+#[derive(Debug)]
 pub enum ServiceError {}
 
 pub enum ServerPacket {
@@ -46,8 +55,11 @@ pub enum ServerPacket {
     ResponseId { id: [char; 64] },
 }
 
-enum ClientReceiverCommand {
-    RequestId(Sender<[char; 64]>),
+pub enum ClientReceiverCommand {
+    RequestId {
+        callback: Sender<[char; 64]>,
+        region: String,
+    },
     ReportClient {
         id: [char; 64],
         sender: Sender<ServerPacket>,
@@ -65,7 +77,9 @@ pub enum ClientPacket {
     ReportId {
         id: [char; 64],
     },
-    RequestId,
+    RequestId {
+        region: String,
+    },
     ReportSensors {
         soil_moisture: u16,
         air_temperature: u16,
@@ -102,21 +116,90 @@ impl Service {
 
     async fn server_main(
         service: ServiceHandle,
-        clients_receiver: Receiver<ClientReceiverCommand>,
+        mut clients_receiver: Receiver<ClientReceiverCommand>,
     ) {
+        while let Some(command) = clients_receiver.recv().await {
+            service
+                .request(ServiceRequest::ReceiverCommand(command))
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn process_sensor(
+        &mut self,
+        id: [char; 64],
+        soil_moisture: u16,
+        air_temperature: u16,
+        light_sensor: u16,
+        image: Vec<u8>,
+    ) {
+        println!(
+            "Id: {}, soil_moisture: {}, air_temperature: {}, light_sensor: {}",
+            id.iter().collect::<String>(),
+            soil_moisture,
+            air_temperature,
+            light_sensor
+        );
+    }
+
+    async fn process_command(&mut self, command: ClientReceiverCommand) {
+        match command {
+            ClientReceiverCommand::RequestId { callback, region } => {
+                let id = match self
+                    .db
+                    .request(DBServiceRequest::CreateNewDevice { region })
+                    .await
+                {
+                    Ok(DBServiceResponse::DeviceId(id)) => id,
+                    Ok(..) => unreachable!(),
+                    Err(_) => ['\0'; 64],
+                };
+                callback.send(id).await.unwrap();
+            }
+            ClientReceiverCommand::ReportClient { id, sender } => {
+                let temperature = match self
+                    .db
+                    .request(DBServiceRequest::GetTemperature { id })
+                    .await
+                {
+                    Ok(DBServiceResponse::Temperature(temp)) => temp,
+                    Ok(..) => unreachable!(),
+                    Err(..) => 0,
+                };
+                self.clients.insert(
+                    id,
+                    ServerClient {
+                        target_temperature: temperature,
+                        sender,
+                    },
+                );
+            }
+            ClientReceiverCommand::ReportSensors {
+                id,
+                soil_moisture,
+                air_temperature,
+                light_sensor,
+                image,
+            } => {
+                self.process_sensor(id, soil_moisture, air_temperature, light_sensor, image)
+                    .await
+            }
+        };
     }
 
     async fn server_listener(sender: Sender<ClientReceiverCommand>) {
         let listener = TcpListener::bind(SocketAddr::new(
             local_ip().expect("Cannot get local ip"),
-            3000,
+            4000,
         ))
         .await
-        .expect("Cannot bind to port 3000");
+        .expect("Cannot bind to port 4000");
         loop {
             let sender = sender.clone();
             match listener.accept().await {
                 Ok((stream, addr)) => tokio::spawn(async move {
+                    println!("Incoming connection {addr}");
                     let mut client = Client::new(sender, stream, addr);
                     client.run().await;
                 }),
@@ -149,6 +232,10 @@ impl super::Service<ServiceRequest, Result<ServiceResponse, ServiceError>> for S
                 access_token,
                 device_id,
             } => Ok(ServiceResponse::Empty),
+            ServiceRequest::ReceiverCommand(command) => {
+                self.process_command(command).await;
+                return Ok(ServiceResponse::Empty);
+            }
         }
     }
 }
