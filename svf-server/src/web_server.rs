@@ -12,6 +12,7 @@ use crate::{is_production, wait_pool::WaitPool, ServiceHandles};
 pub enum BackendResponse {
     Ok,
     AccessToken(String),
+    PasswordChallenge(String),
     Error(String),
 }
 

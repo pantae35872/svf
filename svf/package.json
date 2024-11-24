@@ -29,6 +29,7 @@
   "devDependencies": {
     "@types/http-server": "^0.12.4",
     "@types/node": "^22.9.0",
+    "@types/web-bluetooth": "^0.0.20",
     "@vitejs/plugin-vue": "^5.1.4",
     "cross-env": "^7.0.3",
     "electron": "^33.2.0",

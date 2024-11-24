@@ -12,8 +12,6 @@ struct SaveData {
   char device_id[64];
 };
 
-const char* ssid = "TINN_2.4G";
-const char* password = "0635415591";
 const char* deviceServiceUuid = "f901b2a6-02a1-40ab-8b44-6471bd5886af";
 const char* deviceServiceRequestCharacteristicUuid = "9fbdeb54-dab7-42a0-bca1-6f6a80240c45";
 const char* deviceServiceResponseCharacteristicUuid = "3457d261-fdf2-4e43-98f6-6f9064ff8abd";

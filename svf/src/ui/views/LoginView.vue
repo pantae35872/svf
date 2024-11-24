@@ -13,6 +13,7 @@ import router from '../router';
 import Swal from 'sweetalert2';
 import { inject } from 'vue';
 import { VueCookies } from 'vue-cookies';
+import CryptoJS from 'crypto-js';
 
 inject<VueCookies>('$cookies');
 </script>
@@ -26,9 +27,65 @@ export default {
     };
   },
   methods: {
-    handleUsernameLogin() {
-      console.log(this.username);
-      console.log(this.password);
+    async handleUsernameLogin() {
+      const res = await fetch(`${this.$server}/login/password-challenge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: this.username,
+        }),
+        credentials: 'include',
+      });
+      const result: { PasswordChallenge: string } | { Error: string } = await res.json();
+      if ("PasswordChallenge" in result) {
+        const sha256 = CryptoJS.algo.SHA256.create();
+
+        sha256.update(CryptoJS.enc.Utf8.parse(CryptoJS.SHA256(this.password).toString(CryptoJS.enc.Hex)));
+        sha256.update(CryptoJS.enc.Utf8.parse(result.PasswordChallenge));
+
+        const hash = sha256.finalize().toString(CryptoJS.enc.Hex);
+        const login_res = await fetch(`${this.$server}/login/username`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: this.username,
+            password_challenge_hash: hash,
+          }),
+          credentials: 'include',
+        });
+        const login_result: { AccessToken: string } | { Error: string } = await login_res.json();
+        if ("AccessToken" in login_result) {
+          this.$cookies.set("accessToken", login_result.AccessToken);
+          router.push({ path: "/app/devices"});
+        } else {
+          Swal.fire({ 
+            title: "Error",
+            icon: 'error',
+            color: "var(--fg-color)",
+            text: login_result.Error,
+            background: "var(--bg-color-4)",
+            customClass: {
+              confirmButton: 'confirm-button-style',
+            },
+          });
+        }
+      } else {
+        Swal.fire({ 
+          title: "Error",
+          icon: 'error',
+          color: "var(--fg-color)",
+          text: result.Error,
+          background: "var(--bg-color-4)",
+          customClass: {
+            confirmButton: 'confirm-button-style',
+          },
+        });
+      }
+
     },
     async handleGoogleLogin(response: CallbackTypes.TokenPopupResponse) {
       const res = await fetch(`${this.$server}/login/google`, {
@@ -44,7 +101,7 @@ export default {
       const result: { AccessToken: string } | { Error: string } = await res.json();
       if ("AccessToken" in result) {
         this.$cookies.set("accessToken", result.AccessToken);
-        router.push({ path: "/app"});
+        router.push({ path: "/app/devices"});
       } else {
         Swal.fire({ 
           title: "Error",
@@ -69,7 +126,7 @@ export default {
       <GoogleButton :response="handleGoogleLogin" />
       <Seperator msg="or" />
 
-      <form @summit.prevent="handleUsernameLogin" class="login-form">
+      <form @submit.prevent="handleUsernameLogin" class="login-form">
         <InputField v-model:input="username" placeholder="Username" type="text" :icon="UserIcon"/>
         <InputField v-model:input="password" placeholder="Password" type="password" :icon="PasswordIcon"/>
         <router-link to="/app/reset_password" class="forgot-pass-text">Forgot Password?</router-link>

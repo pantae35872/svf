@@ -1,8 +1,12 @@
 use std::env;
 
 use rand::{distributions::Alphanumeric, Rng};
+use sha2::{
+    digest::{DynDigest, Update},
+    Digest, Sha256,
+};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Client, GenericClient, NoTls};
 
 use super::{Service, ServiceHandle, ServiceRequest};
 
@@ -21,9 +25,19 @@ pub enum DBServiceRequest {
         username: String,
         password_hash: String,
     },
+    CreatePasswordChallenge {
+        username: String,
+        challenge: [char; 64],
+    },
+    ConsumePasswordWithChallenge {
+        username: String,
+    },
     CreateUserGoogle {
         username: String,
         google_id: String,
+    },
+    CreateAccessTokenUsername {
+        username: String,
     },
     CreateAccessTokenGoogle {
         google_id: String,
@@ -34,11 +48,13 @@ pub enum DBServiceError {
     UnregisterdAccount,
     UserAlreadyExists,
     GoogleTaken,
+    AuthenticationMismatch,
 }
 
 pub enum DBServiceResponse {
     Empty,
     AccessToken([char; 128]),
+    PasswordHashWithChallenge([char; 64]),
 }
 
 impl DBService {
@@ -113,6 +129,80 @@ impl DBService {
         ))
     }
 
+    async fn create_access_token_username(
+        &mut self,
+        username: String,
+    ) -> Result<DBServiceResponse, DBServiceError> {
+        let token: String = {
+            let mut rng = rand::thread_rng();
+            (0..128)
+                .map(|_| rng.sample(Alphanumeric))
+                .map(char::from)
+                .collect()
+        };
+        self.client
+            .query(
+                "
+            WITH users_id AS (
+                SELECT user_id 
+                FROM users 
+                WHERE username = $1::TEXT
+            ) 
+            INSERT INTO access_token (token_id, user_id) 
+            SELECT $2::TEXT, user_id 
+            FROM users_id",
+                &[&username, &token],
+            )
+            .await
+            .unwrap();
+        Ok(DBServiceResponse::AccessToken(
+            token.chars().collect::<Vec<char>>().try_into().unwrap(),
+        ))
+    }
+
+    async fn consume_password_hash_with_challenge(
+        &mut self,
+        username: String,
+    ) -> Result<DBServiceResponse, DBServiceError> {
+        let user_row = self
+            .client
+            .query(
+                "SELECT password_hash, password_challenge FROM users WHERE username = $1::TEXT",
+                &[&username],
+            )
+            .await
+            .unwrap();
+        if let Some(user) = user_row.get(0) {
+            match (
+                user.get::<_, Option<String>>("password_hash"),
+                user.get::<_, Option<String>>("password_challenge"),
+            ) {
+                (Some(password_hash), Some(password_challenge)) => {
+                    let mut sha = Sha256::new();
+                    Digest::update(&mut sha, password_hash);
+                    Digest::update(&mut sha, password_challenge);
+                    let result: [char; 64] = format!("{:x}", sha.finalize())
+                        .chars()
+                        .collect::<Vec<_>>() // Collect into a Vec<char> temporarily
+                        .try_into() // Convert Vec<char> to [char; 64]
+                        .expect("Hash must be exactly 64 hex characters");
+                    self.client
+                        .query(
+                            "UPDATE users
+                            SET password_challenge = NULL 
+                            WHERE username = $1::TEXT",
+                            &[&username],
+                        )
+                        .await
+                        .unwrap();
+                    return Ok(DBServiceResponse::PasswordHashWithChallenge(result));
+                }
+                _ => return Err(DBServiceError::AuthenticationMismatch),
+            }
+        }
+        return Err(DBServiceError::UnregisterdAccount);
+    }
+
     async fn create_user_google(
         &mut self,
         username: String,
@@ -160,6 +250,23 @@ impl DBService {
             .await
             .unwrap();
         Ok(DBServiceResponse::Empty)
+    }
+
+    async fn create_password_challenge(
+        &mut self,
+        username: String,
+        challenge: [char; 64],
+    ) -> Result<DBServiceResponse, DBServiceError> {
+        self.client
+            .query(
+                "UPDATE users
+SET password_challenge = $1::TEXT 
+WHERE username = $2::TEXT",
+                &[&challenge.iter().collect::<String>(), &username],
+            )
+            .await
+            .unwrap();
+        return Ok(DBServiceResponse::Empty);
     }
 
     async fn create_user_default(
@@ -218,6 +325,16 @@ impl Service<DBServiceRequest, Result<DBServiceResponse, DBServiceError>> for DB
             } => self.create_user_google(username, google_id).await,
             DBServiceRequest::CreateAccessTokenGoogle { google_id } => {
                 self.create_access_token_by_google_id(google_id).await
+            }
+            DBServiceRequest::CreatePasswordChallenge {
+                username,
+                challenge,
+            } => self.create_password_challenge(username, challenge).await,
+            DBServiceRequest::ConsumePasswordWithChallenge { username } => {
+                self.consume_password_hash_with_challenge(username).await
+            }
+            DBServiceRequest::CreateAccessTokenUsername { username } => {
+                self.create_access_token_username(username).await
             }
         }
     }
