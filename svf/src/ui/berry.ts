@@ -12,10 +12,7 @@ async function waitForNotification(characteristic: BluetoothRemoteGATTCharacteri
       }
     };
 
-    // Attach the event listener for notifications
     characteristic.addEventListener("characteristicvaluechanged", onNotification);
-
-    // Ensure notifications are started
     characteristic.startNotifications().catch(reject);
   });
 }
@@ -81,10 +78,11 @@ async function send_request(request_characteristic: BluetoothRemoteGATTCharacter
   await request_characteristic.writeValue(data);
 }
 
-export async function request_berry(): Promise<string | null> {
+export async function request_berry(server_addr: string): Promise<string | null> {
   const SERVICE_UUID = 'f901b2a6-02a1-40ab-8b44-6471bd5886af'; // Battery Service UUID
   const REQUEST_CHARACTERISTIC_UUID = '9fbdeb54-dab7-42a0-bca1-6f6a80240c45';
   const RESPONSE_CHARACTERISTIC_UUID = '3457d261-fdf2-4e43-98f6-6f9064ff8abd';
+  let rdata: string | null = null;
   try {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [SERVICE_UUID] }],
@@ -114,10 +112,33 @@ export async function request_berry(): Promise<string | null> {
         }
       }
       await send_request(request_characteristic, {
-        request: "device-id",
+        request: "device"
       });
-      const device_id: { device_id: string } = await get_response(response_characteristic);
-      console.log(device_id.device_id);
+      const device_res: { need_id: boolean } = await get_response(response_characteristic);
+      if (device_res.need_id) {
+        const res = await fetch(`${server_addr}/app/request-id`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            region: "japan",
+          }),
+          credentials: 'include',
+        });
+        const data: { DeviceId: string } = await res.json();
+        rdata = data.DeviceId;
+        await send_request(request_characteristic, {
+          request: "device-set",
+          device_id: data.DeviceId,
+        });
+      } else {
+        await send_request(request_characteristic, {
+          request: "device-get",
+        });
+        const device_id: { device_id: string } = await get_response(response_characteristic);
+        rdata = device_id.device_id;
+      }
       await send_request(request_characteristic, {
         request: "close",
       });
@@ -156,5 +177,5 @@ export async function request_berry(): Promise<string | null> {
       }
     });
   }
-  return null;
+  return rdata;
 }

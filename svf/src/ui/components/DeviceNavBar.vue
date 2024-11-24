@@ -11,7 +11,7 @@ const settings = () => {
 export default {
   methods: {
     async add_devices() {
-      console.log(await request_berry());
+      console.log(await request_berry(this.$server));
     }
   }
 }
