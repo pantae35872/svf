@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import Swal from 'sweetalert2';
 import router from '../router';
 import { request_berry } from '../berry';
 

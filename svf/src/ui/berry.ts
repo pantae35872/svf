@@ -85,7 +85,6 @@ export async function request_berry(): Promise<string | null> {
   const SERVICE_UUID = 'f901b2a6-02a1-40ab-8b44-6471bd5886af'; // Battery Service UUID
   const REQUEST_CHARACTERISTIC_UUID = '9fbdeb54-dab7-42a0-bca1-6f6a80240c45';
   const RESPONSE_CHARACTERISTIC_UUID = '3457d261-fdf2-4e43-98f6-6f9064ff8abd';
-  let data: string | null = null;
   try {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [SERVICE_UUID] }],
