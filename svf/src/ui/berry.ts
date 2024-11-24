@@ -20,6 +20,13 @@ async function waitForNotification(characteristic: BluetoothRemoteGATTCharacteri
   });
 }
 
+async function get_response(response_characteristic: BluetoothRemoteGATTCharacteristic): Promise<any> {
+  const value = await waitForNotification(response_characteristic);
+  const decoder = new TextDecoder();
+  const message = decoder.decode(value);
+  return JSON.parse(message);
+}
+
 
 async function get_ssid_password(): Promise<{ ssid: string | null, password: string | null }> {
   const ssid = await Swal.fire({
@@ -57,14 +64,21 @@ async function get_ssid_password(): Promise<{ ssid: string | null, password: str
     allowOutsideClick: false,
   });
 
-  if (typeof (password) == 'string' && typeof (ssid) == 'string') {
+  if (typeof (password.value) == 'string' && typeof (ssid.value) == 'string') {
     return {
-      ssid: ssid,
-      password: password,
+      ssid: ssid.value,
+      password: password.value,
     };
   }
 
   return { ssid: null, password: null };
+}
+
+async function send_request(request_characteristic: BluetoothRemoteGATTCharacteristic, request: any) {
+  const message = JSON.stringify(request);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  await request_characteristic.writeValue(data);
 }
 
 export async function request_berry(): Promise<string | null> {
@@ -85,34 +99,50 @@ export async function request_berry(): Promise<string | null> {
     const request_characteristic = await service?.getCharacteristic(REQUEST_CHARACTERISTIC_UUID);
     const response_characteristic = await service?.getCharacteristic(RESPONSE_CHARACTERISTIC_UUID);
     await response_characteristic?.startNotifications();
-    if (response_characteristic) {
-      while (true) {
-        const value = await waitForNotification(response_characteristic);
-        const decoder = new TextDecoder();
-        const message = decoder.decode(value);
-        console.log(message);
-        let msg: { wifi_request: string } | { device_id: string } = JSON.parse(message);
-        if ("wifi_request" in msg) {
-          let credential = await get_ssid_password();
-          if (credential.ssid && credential.password) {
-            const message = JSON.stringify({
-              ssid: credential.ssid,
-              password: credential.password,
-            });
-            const encoder = new TextEncoder();
-            const data = encoder.encode(message);
-            await request_characteristic?.writeValue(data);
-          }
-        } else if ("device_id" in msg) {
+    if (response_characteristic && request_characteristic) {
+      await send_request(request_characteristic, {
+        request: "wifi"
+      });
+      const wifi_res: { need_wifi: boolean } = await get_response(response_characteristic);
+      if (wifi_res.need_wifi) {
+        const { ssid, password } = await get_ssid_password();
+        if (ssid && password) {
+          await send_request(request_characteristic, {
+            request: "wifi-set",
+            ssid: ssid,
+            password: password,
+          });
+        }
+      }
+      await send_request(request_characteristic, {
+        request: "device-id",
+      });
+      const device_id: { device_id: string } = await get_response(response_characteristic);
+      console.log(device_id.device_id);
+      await send_request(request_characteristic, {
+        request: "close",
+      });
+      //let msg: { wifi_request: string } | { device_id: string } = JSON.parse(message);
+      /*if ("wifi_request" in msg) {
+        let credential = await get_ssid_password();
+        if (credential.ssid && credential.password) {
           const message = JSON.stringify({
-            close: "",
+            ssid: credential.ssid,
+            password: credential.password,
           });
           const encoder = new TextEncoder();
           const data = encoder.encode(message);
           await request_characteristic?.writeValue(data);
-          return msg.device_id;
         }
-      }
+      } else if ("device_id" in msg) {
+        const message = JSON.stringify({
+          close: "",
+        });
+        const encoder = new TextEncoder();
+        const data = encoder.encode(message);
+        await request_characteristic?.writeValue(data);
+        return msg.device_id;
+      }*/
     }
   } catch (error) {
     console.log(error);
