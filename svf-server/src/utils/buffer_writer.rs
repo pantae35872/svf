@@ -15,6 +15,13 @@ impl<'a> BufferWriter<'a> {
         self
     }
 
+    pub fn write_string(&mut self, string: String) -> &mut Self {
+        let str_byte = string.as_bytes();
+        self.write_u32(str_byte.len() as u32);
+        self.write_bytes(str_byte);
+        self
+    }
+
     pub fn write_i64(&mut self, data: i64) -> &mut Self {
         self.write_bytes(&data.to_le_bytes());
         self

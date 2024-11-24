@@ -12,14 +12,12 @@ use super::{
 pub enum ServerPacketId {
     UpdateCooler = 0,
     WaterPulse,
-    ResponseId,
 }
 
 impl From<&ServerPacket> for ServerPacketId {
     fn from(value: &ServerPacket) -> Self {
         match value {
             ServerPacket::WaterPulse => Self::WaterPulse,
-            ServerPacket::ResponseId { .. } => Self::ResponseId,
             ServerPacket::UpdateCooler { .. } => Self::UpdateCooler,
         }
     }
@@ -38,11 +36,6 @@ impl PacketId for ServerPacketId {
                 buffer.write_bool(status);
             }
             (Self::WaterPulse, ServerPacket::WaterPulse) => {}
-            (Self::ResponseId, ServerPacket::ResponseId { id }) => {
-                id.iter().for_each(|e| {
-                    buffer.write_u8(*e as u8);
-                });
-            }
             _ => panic!("Unmatch packet"),
         }
     }

@@ -13,6 +13,7 @@ pub enum BackendResponse {
     Ok,
     AccessToken(String),
     PasswordChallenge(String),
+    DeviceId(String),
     Error(String),
 }
 

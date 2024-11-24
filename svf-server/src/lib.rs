@@ -19,6 +19,7 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use wait_pool::WaitPool;
 
+pub mod app;
 pub mod login;
 pub mod service;
 pub mod signup;
@@ -62,6 +63,7 @@ pub fn router() -> Router<Arc<ServiceHandles>> {
         .route("/login/password-challenge", post(login::password_challenge))
         .route("/signup/username", post(signup::username))
         .route("/signup/google", post(signup::google))
+        .route("/app/request-id", post(app::request_id))
         .layer(ServiceBuilder::new().layer(build_cors()))
         .fallback(notfound_handler)
 }

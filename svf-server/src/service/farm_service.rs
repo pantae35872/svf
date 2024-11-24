@@ -52,14 +52,9 @@ pub enum ServiceError {}
 pub enum ServerPacket {
     UpdateCooler { status: bool },
     WaterPulse,
-    ResponseId { id: [char; 64] },
 }
 
 pub enum ClientReceiverCommand {
-    RequestId {
-        callback: Sender<[char; 64]>,
-        region: String,
-    },
     ReportClient {
         id: [char; 64],
         sender: Sender<ServerPacket>,
@@ -76,9 +71,6 @@ pub enum ClientReceiverCommand {
 pub enum ClientPacket {
     ReportId {
         id: [char; 64],
-    },
-    RequestId {
-        region: String,
     },
     ReportSensors {
         soil_moisture: u16,
@@ -118,11 +110,20 @@ impl Service {
         service: ServiceHandle,
         mut clients_receiver: Receiver<ClientReceiverCommand>,
     ) {
-        while let Some(command) = clients_receiver.recv().await {
-            service
+        loop {
+            let command = match clients_receiver.recv().await {
+                Some(command) => command,
+                None => continue,
+            };
+            match service
                 .request(ServiceRequest::ReceiverCommand(command))
                 .await
-                .unwrap();
+            {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("{err:?}");
+                }
+            };
         }
     }
 
@@ -145,18 +146,6 @@ impl Service {
 
     async fn process_command(&mut self, command: ClientReceiverCommand) {
         match command {
-            ClientReceiverCommand::RequestId { callback, region } => {
-                let id = match self
-                    .db
-                    .request(DBServiceRequest::CreateNewDevice { region })
-                    .await
-                {
-                    Ok(DBServiceResponse::DeviceId(id)) => id,
-                    Ok(..) => unreachable!(),
-                    Err(_) => ['\0'; 64],
-                };
-                callback.send(id).await.unwrap();
-            }
             ClientReceiverCommand::ReportClient { id, sender } => {
                 let temperature = match self
                     .db
