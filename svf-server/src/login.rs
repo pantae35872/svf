@@ -37,7 +37,25 @@ pub async fn password_challenge(
     State(services): State<Arc<ServiceHandles>>,
     Json(data): Json<PasswordChallenge>,
 ) -> impl IntoResponse {
-    (StatusCode::OK, Json(BackendResponse::Ok))
+    let challenge = match match services
+        .auth_service
+        .request(AuthenticationServiceRequest::PasswordChallenge {
+            username: data.username,
+        })
+        .await
+    {
+        Ok(access_token) => access_token,
+        Err(err) => return (err.clone().into(), err.into()),
+    } {
+        AuthenticationServiceResponse::PasswordChallenge(challenge) => challenge,
+        _ => unreachable!(),
+    };
+    (
+        StatusCode::OK,
+        Json(BackendResponse::PasswordChallenge(
+            challenge.iter().collect::<String>(),
+        )),
+    )
 }
 
 pub async fn google(
@@ -65,12 +83,28 @@ pub async fn google(
     )
 }
 
-pub async fn username(Json(data): Json<UsernameLogin>) -> impl IntoResponse {
-    //let mut headers = HeaderMap::new();
-    //headers.insert(
-    //    SET_COOKIE,
-    //    HeaderValue::from_str(&format!("accessToken={}", "aa")).unwrap(),
-    //);
-    dbg!(data);
-    (StatusCode::OK, Json(BackendResponse::Ok))
+pub async fn username(
+    State(services): State<Arc<ServiceHandles>>,
+    Json(data): Json<UsernameLogin>,
+) -> impl IntoResponse {
+    let access_token = match match services
+        .auth_service
+        .request(AuthenticationServiceRequest::DefaultLogin {
+            username: data.username,
+            password_hash: data.password_challenge_hash,
+        })
+        .await
+    {
+        Ok(access_token) => access_token,
+        Err(err) => return (err.clone().into(), err.into()),
+    } {
+        AuthenticationServiceResponse::AccessToken(token) => token,
+        _ => unreachable!(),
+    };
+    (
+        StatusCode::OK,
+        Json(BackendResponse::AccessToken(
+            access_token.iter().collect::<String>(),
+        )),
+    )
 }

@@ -8,6 +8,7 @@ import AppView from "./views/AppView.vue";
 import TOSView from "./views/TOSView.vue";
 import PrivacyView from "./views/PrivacyView.vue";
 import SignUpView from "./views/SignUpView.vue";
+import DeviceView from "./views/DeviceView.vue";
 
 const routes = [
   { path: '/', component: HomeView },
@@ -29,6 +30,10 @@ const routes = [
     {
       path: 'signup',
       component: SignUpView,
+    },
+    {
+      path: 'devices',
+      component: DeviceView,
     }
   ]},
   { path: '/:pathMatch(.*)*', component: NotFoundView }

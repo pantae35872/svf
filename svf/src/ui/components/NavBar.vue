@@ -23,7 +23,6 @@ export default {
       <nav :class="{'nav-open': isOpen}">
         <router-link class="router-link link" to="/term-of-service">Term of Service</router-link>
         <router-link class="router-link link" to="/privacy">Privacy Policies</router-link>
-        <router-link to="/app/logout" class="router-link button">Logout</router-link>
         <router-link to="/app/login" class="router-link button">Login</router-link>
         <router-link to="/app/signup" class="router-link button">Sign up</router-link>
       </nav>
@@ -91,7 +90,7 @@ export default {
 
   .nav-open {
     z-index: 1;
-    transform: translateY(0%);
+    transform: translateY(10%);
   }
 
   .router-link {

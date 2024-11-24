@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fs::read_dir, net::SocketAddr, sync::Arc};
 
 use super::db_service::DBServiceHandle;
-use crate::service::Service;
 use client::{Client, ClientPacketId};
 use futures::FutureExt;
 use local_ip_address::local_ip;
@@ -41,7 +40,7 @@ pub enum ServiceRequest {
 
 pub enum ServiceError {}
 
-enum ServerPacket {
+pub enum ServerPacket {
     UpdateCooler { status: bool },
     WaterPulse,
     ResponseId { id: [char; 64] },
@@ -62,7 +61,7 @@ enum ClientReceiverCommand {
     },
 }
 
-enum ClientPacket {
+pub enum ClientPacket {
     ReportId {
         id: [char; 64],
     },
