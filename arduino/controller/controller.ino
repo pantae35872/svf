@@ -40,8 +40,7 @@ void setup() {
 
   if (!BLE.begin()) {
     Serial.println("- Starting Bluetooth® Low Energy module failed!");
-    while (1)
-      ;
+    while (1);
   }
 
   BLE.setAdvertisedService(berryService);
@@ -49,12 +48,6 @@ void setup() {
   berryService.addCharacteristic(berryResponseCharacteristic);
   BLE.addService(berryService);
   BLE.advertise();
-
-  // WiFi.begin(ssid, password);
-  // while (WiFi.status() != WL_CONNECTED) {
-  //   delay(1000);
-  //   Serial.print(".");
-  // }
   memset(&data, 0, sizeof(SaveData));
   EEPROM.get(0, data);
   Serial << "Device: " << data.device << endl;
@@ -112,9 +105,13 @@ void loop() {
       if (client.connect("192.168.1.123", 4000)) {
         Serial << "Connection Successful" << endl;
       }
+    } else {
+      if (client.available()) {
+        uint8_t header[16];
+        client.read(header, 16);
+      }
     }
   } else if (wifi_timeout < 3 && data.wifi) {
-    Serial << WiFi.status() << endl;
     Serial << "Connecting to wifi. retry count: " << wifi_timeout << endl;
     WiFi.begin((const char*)&data.wifi_ssid, (const char*)&data.wifi_password);
     delay(1000);
