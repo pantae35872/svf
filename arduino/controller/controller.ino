@@ -2,6 +2,7 @@
 #include <ArduinoBLE.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
+#include <Streaming.h>
 
 struct SaveData {
   bool wifi;
@@ -32,6 +33,9 @@ void setup() {
   // put your setup code here, to run once:
   Serial1.begin(57600);
   Serial.begin(9600);
+  while (!Serial) {
+    delay(1);
+  }
   EEPROM.begin();  // Initialize EEPROM with 512 bytes
   BLE.setDeviceName("BerryBotics");
   BLE.setLocalName("BerryBotics");
@@ -47,6 +51,7 @@ void setup() {
   berryService.addCharacteristic(berryResponseCharacteristic);
   BLE.addService(berryService);
   BLE.advertise();
+
   // WiFi.begin(ssid, password);
   // while (WiFi.status() != WL_CONNECTED) {
   //   delay(1000);
@@ -54,61 +59,87 @@ void setup() {
   // }
   memset(&data, 0, sizeof(SaveData));
   EEPROM.get(0, data);
+  Serial << "Device: " << data.device << endl;
+  Serial << "Wifi: " << data.wifi << endl;
+  Serial << "SSID: " << String(data.wifi_ssid) << endl;
+  Serial << "PASSWORD: " << String(data.wifi_password) << endl;
+  Serial << "DEVICE_ID: " << String(data.device_id) << endl;
 }
 
 void loop() {
   BLEDevice central = BLE.central();
   if (central) {
-    bool wifi_sent = false;
-    bool device_sent = false;
     while (central.connected()) {
-      if (data.wifi == false && !wifi_sent) {
-        JsonDocument doc;
-        doc["wifi_request"] = "";
-        String value;
-        serializeJson(doc, value);
-        berryResponseCharacteristic.setValue(value);
-        wifi_sent = true;
-      }
-      if (data.device == true && !device_sent) {
-        JsonDocument doc;
-        doc["device_id"] = "111";
-        String value;
-        serializeJson(doc, value);
-        berryResponseCharacteristic.setValue(value);
-        device_sent = true;
-      }
       if (berryRequestCharacteristic.written()) {
-        String wifi = berryRequestCharacteristic.value();
+        String incoming = berryRequestCharacteristic.value();
         JsonDocument doc;
-        deserializeJson(doc, wifi);
-        if (doc["ssid"].is<String>() && doc["password"].is<String>()) {
-          String ssid = doc["ssid"];
-          String password = doc["password"];
-          data.wifi = true;
-          EEPROM.put(0, data);
-        } else if (doc["close"].is<String>()) {
-          central.disconnect();
+        deserializeJson(doc, incoming);
+        Serial.println("Incoming Request");
+        Serial.println(incoming);
+        if (doc["request"].is<String>()) {
+          String request = doc["request"];
+          if (request.equals("wifi")) {
+            JsonDocument doc;
+            if (data.wifi == false) {
+              doc["need_wifi"] = true;
+            } else {
+              doc["need_wifi"] = false;
+            }
+            String data;
+            serializeJson(doc, data);
+            berryResponseCharacteristic.setValue(data);
+          } else if (request.equals("wifi-set")) {
+            String ssid = doc["ssid"];
+            String password = doc["password"];
+            data.wifi = true;
+            strncpy((char*)&data.wifi_ssid, ssid.c_str(), sizeof(data.wifi_ssid));
+            strncpy((char*)&data.wifi_password, password.c_str(), sizeof(data.wifi_password));
+            EEPROM.put(0, data);
+          } else if (request.equals("device-id")) {
+            JsonDocument doc;
+            doc["device_id"] = String(data.device_id);
+            String data;
+            serializeJson(doc, data);
+            berryResponseCharacteristic.setValue(data);
+          } else if (request.equals("close")) {
+            central.disconnect();
+          }
         }
       }
-      delay(10);
     }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
     if (!client.connected()) {
-      client.connect("35.198.240.174", 4000);
-      return;
+      if (client.connect("192.168.1.123", 4000)) {
+        Serial << "Connection Successful" << endl;
+      }
     }
-  } else if (wifi_timeout < 10 && data.wifi) {
-    WiFi.begin((const char*)&data.wifi_password, (const char*)&data.wifi_password);
+  } else if (wifi_timeout < 3 && data.wifi) {
+    Serial << WiFi.status() << endl;
+    Serial << "Connecting to wifi. retry count: " << wifi_timeout << endl;
+    WiFi.begin((const char*)&data.wifi_ssid, (const char*)&data.wifi_password);
+    delay(1000);
     wifi_timeout++;
-  } else {
+  } else if (wifi_timeout >= 3 && data.wifi) {
     data.wifi = false;
     wifi_timeout = 0;
     EEPROM.put(0, data);
   }
-  delay(100);
+  // if (WiFi.status() == WL_CONNECTED) {
+  //   if (!client.connected()) {
+  //     client.connect("35.198.240.174", 4000);
+  //     return;
+  //   }
+  // } else if (wifi_timeout < 10 && data.wifi) {
+  //   WiFi.begin((const char*)&data.wifi_password, (const char*)&data.wifi_password);
+  //   wifi_timeout++;
+  // } else {
+  //   data.wifi = false;
+  //   wifi_timeout = 0;
+  //   EEPROM.put(0, data);
+  // }
+  // delay(100);
   // Do other tasks here
   //delay(100); // Simulating work (replace with your actual task)
 
