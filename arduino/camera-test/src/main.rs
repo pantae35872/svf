@@ -6,7 +6,7 @@ use std::{
 };
 
 fn main() {
-    let listener = TcpListener::bind("192.168.1.123:4000").unwrap();
+    let listener = TcpListener::bind("192.168.59.116:4000").unwrap();
 
     for stream in listener.incoming() {
         let mut stream = stream.unwrap();
