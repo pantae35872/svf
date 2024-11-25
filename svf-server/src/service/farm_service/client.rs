@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 
-use axum_extra::headers::Server;
 use futures::FutureExt;
 use num_enum::TryFromPrimitive;
 use tokio::{
@@ -33,6 +32,17 @@ struct PendingReport {
     image_size: usize,
 }
 
+#[derive(Debug)]
+enum ClientError {
+    InvalidPacket(PacketError),
+}
+
+impl From<PacketError> for ClientError {
+    fn from(value: PacketError) -> Self {
+        Self::InvalidPacket(value)
+    }
+}
+
 impl Client {
     pub fn new(
         client_sender: Sender<ClientReceiverCommand>,
@@ -49,11 +59,15 @@ impl Client {
         }
     }
 
-    async fn handle_client_packet(&mut self, header: PacketHeader, sender: Sender<ServerPacket>) {
+    async fn handle_client_packet(
+        &mut self,
+        header: PacketHeader,
+        sender: Sender<ServerPacket>,
+    ) -> Result<(), ClientError> {
         let mut buffer = vec![0u8; header.length() as usize];
         self.stream.read(&mut buffer).await.unwrap();
-        let packet = Packet::<ClientPacketId>::new(header.id(), &mut buffer).unwrap();
-        match packet.decode().unwrap() {
+        let packet = Packet::<ClientPacketId>::new(header.id(), &mut buffer)?;
+        match packet.decode()? {
             ClientPacket::ReportId { id } => {
                 self.id = Some(id);
                 self.client_sender
@@ -94,6 +108,7 @@ impl Client {
                 }
             }
         }
+        return Ok(());
     }
 
     async fn handle_server_packet(&mut self, server_packet: ServerPacket) {
@@ -113,7 +128,6 @@ impl Client {
         loop {
             let stream_task = self.stream.read(&mut header_buffer).fuse();
             let receiver_task = server_receiver.recv().fuse();
-
             futures::pin_mut!(stream_task, receiver_task);
 
             futures::select! {

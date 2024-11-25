@@ -7,6 +7,7 @@ use client::{Client, ClientPacketId};
 use futures::FutureExt;
 use local_ip_address::local_ip;
 use packet::{Packet, PacketHeader};
+use sha2::digest::typenum::TArr;
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
@@ -36,6 +37,7 @@ pub struct Service {
     receiver: Receiver<ServiceChannel>,
     db: DBServiceHandle,
     clients: HashMap<[char; 64], ServerClient>,
+    test_image: Option<Vec<u8>>,
 }
 
 pub enum ServiceRequest {
@@ -43,6 +45,7 @@ pub enum ServiceRequest {
         access_token: [char; 128],
         device_id: [char; 64],
     },
+    Image,
     ReceiverCommand(ClientReceiverCommand),
 }
 
@@ -85,6 +88,7 @@ pub enum ClientPacket {
 }
 
 pub enum ServiceResponse {
+    Image(Option<Vec<u8>>),
     Empty,
 }
 
@@ -98,6 +102,7 @@ impl Service {
             receiver,
             clients: HashMap::new(),
             db,
+            test_image: None,
         };
         tokio::spawn(Self::server_main(
             super::Service::get(&service),
@@ -135,6 +140,24 @@ impl Service {
         light_sensor: u16,
         image: Vec<u8>,
     ) {
+        let client = match self.clients.get(&id) {
+            Some(client) => client,
+            None => {
+                println!("Unknown client with id {}", id.iter().collect::<String>());
+                return;
+            }
+        };
+        client
+            .sender
+            .send(ServerPacket::UpdateCooler {
+                status: (air_temperature as i32) < client.target_temperature,
+            })
+            .await
+            .unwrap();
+        if soil_moisture > 500 {
+            client.sender.send(ServerPacket::WaterPulse).await.unwrap();
+        }
+
         println!(
             "Id: {}, soil_moisture: {}, air_temperature: {}, light_sensor: {}",
             id.iter().collect::<String>(),
@@ -221,6 +244,7 @@ impl super::Service<ServiceRequest, Result<ServiceResponse, ServiceError>> for S
                 access_token,
                 device_id,
             } => Ok(ServiceResponse::Empty),
+            ServiceRequest::Image => self.get_image().await,
             ServiceRequest::ReceiverCommand(command) => {
                 self.process_command(command).await;
                 return Ok(ServiceResponse::Empty);

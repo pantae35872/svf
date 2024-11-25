@@ -3,7 +3,7 @@ use std::{env, sync::Arc};
 use axum::{
     http::{HeaderValue, StatusCode},
     response::IntoResponse,
-    routing::post,
+    routing::{get, post},
     Router,
 };
 use reqwest::{
@@ -16,7 +16,7 @@ use service::{
     farm_service, serve_service, Service,
 };
 use tower::ServiceBuilder;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use wait_pool::WaitPool;
 
 pub mod app;

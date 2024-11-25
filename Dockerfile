@@ -20,7 +20,7 @@ ENV KEY_PATH=/app/certs/priv.pem
 
 RUN chmod +x /usr/local/bin/server
 
-EXPOSE 80 443
+EXPOSE 80 443 4000
 
 WORKDIR /app
 
