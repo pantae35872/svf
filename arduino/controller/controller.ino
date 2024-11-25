@@ -3,8 +3,16 @@
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <Streaming.h>
+#include <DHT22.h>
 
-#define RESET_PIN 4
+#define SERVER_IP "35.198.240.174"
+#define SERVER_PORT 4000
+#define DHT22_PIN A0
+#define SOIL_MOISTURE A1
+#define LIGHT_SENSOR A2
+#define COOLER_PWM 3
+#define COOLER_ENABLE 4
+#define WATER_PUMP_ENABLE 5
 
 enum class ClientPacket : uint32_t {
   ReportId = 0,
@@ -15,7 +23,6 @@ enum class ClientPacket : uint32_t {
 enum class ServerPacket : uint32_t {
   UpdateCooler = 0,
   WaterPulse,
-  ResponseId,
 };
 
 
@@ -242,13 +249,15 @@ BLEStringCharacteristic berryResponseCharacteristic(deviceServiceResponseCharact
 WiFiClient client;
 
 unsigned long previousMillis = 0;  // stores the last time the event was triggered
-const long interval = 5000;         // interval in milliseconds (1 second)
+const long interval = 5000;        // interval in milliseconds (1 second)
 int wifiTimeout = 0;
 bool deviceIdRequestPending = false;
 
 SaveData data;
+DHT22 dht22(DHT22_PIN);
 
 void setup() {
+  
   // put your setup code here, to run once:
   Serial1.begin(57600);
   Serial.begin(9600);
@@ -290,6 +299,9 @@ void setup() {
     default:
       break;
   }
+
+  delay(1500);
+  while (Serial1.available() > 0) Serial1.read();
 }
 
 void send_packet(ClientPacket id, uint32_t len, const uint8_t* buffer) {
@@ -301,15 +313,21 @@ void send_packet(ClientPacket id, uint32_t len, const uint8_t* buffer) {
 }
 
 void process_server_packet(ServerPacket id, BufferReader reader) {
+  bool value = false;
   switch (id) {
-    case ServerPacket::ResponseId:
-      reader.readBytes((uint8_t*)&data.device_id, 64);
-      data.device = 1;
-      EEPROM.put(0, data);
-      break;
     case ServerPacket::UpdateCooler:
+      reader.readBool(value);
+      analogWrite(COOLER_PWM, 255);
+      if (value) {
+        digitalWrite(COOLER_ENABLE, HIGH);
+      } else {
+        digitalWrite(COOLER_ENABLE,  LOW);
+      }
       break;
     case ServerPacket::WaterPulse:
+      analogWrite(WATER_PUMP_ENABLE, HIGH);
+      delay(1500);
+      analogWrite(WATER_PUMP_ENABLE, HIGH);
       break;
   }
 }
@@ -352,7 +370,7 @@ NetworkStatus setupNetwork() {
   int server_timeout = 0;
   while (!client.connected() && server_timeout < 3) {
     Serial << "Connecting to the server" << endl;
-    client.connect("35.198.240.174", 4000);
+    client.connect(SERVER_IP, SERVER_PORT);
     delay(1000);
     server_timeout++;
   }
@@ -368,6 +386,49 @@ NetworkStatus setupNetwork() {
   }
 
   return NetworkStatus::Ok;
+}
+
+void client_loop() {
+  if (client.available()) {
+    receive_packet();
+  }
+  uint8_t magic_bytes[4];
+  Serial1.readBytes(magic_bytes, 4);
+  uint32_t magic = (uint32_t)magic_bytes[0] << 24 | (uint32_t)magic_bytes[1] << 16 | (uint32_t)magic_bytes[2] << 8 | (uint32_t)magic_bytes[3];
+  ;
+  if (magic != 0x55AA) {
+    return;
+  }
+  uint8_t length_byte[4];
+  size_t readed = Serial1.readBytes(length_byte, 4);
+  while (readed != 4) {
+    readed = Serial1.readBytes(length_byte, 4 - readed);
+  }
+  uint32_t length = (uint32_t)length_byte[0] << 24 | (uint32_t)length_byte[1] << 16 | (uint32_t)length_byte[2] << 8 | (uint32_t)length_byte[3];
+  if (readed <= 0) return;
+  if (length <= 0) return;
+
+  BufferWriter writer;
+  writer.writeU16(analogRead(SOIL_MOISTURE));
+  writer.writeU16(dht22.getTemperature());
+  writer.writeU16(analogRead(LIGHT_SENSOR));
+  writer.writeU64(length);
+  send_packet(ClientPacket::ReportSensors, writer.getSize(), writer.getBuffer());
+  size_t wrotes = 0;
+  size_t write_count = 128;
+  while (wrotes < length) {
+    if (length - wrotes < 128) {
+      write_count = length - wrotes;
+    }
+    uint8_t buffer[128];
+    BufferWriter packet(136);
+    size_t readed = Serial1.readBytes(buffer, write_count);
+    packet.writeU64(readed);
+    packet.writeBytes(buffer, 128);
+    send_packet(ClientPacket::ImageFrame, packet.getSize(), packet.getBuffer());
+    wrotes += readed;
+    delay(50);
+  }
 }
 
 void loop() {
@@ -426,7 +487,7 @@ void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
     if (!client.connected()) {
-      if (client.connect("35.198.240.174", 4000)) {
+      if (client.connect(SERVER_IP, SERVER_PORT)) {
         Serial << "Connection Successful" << endl;
         if (data.device) {
           BufferWriter writer;
@@ -438,23 +499,7 @@ void loop() {
         delay(1000);
       }
     } else {
-        if (millis() - previousMillis >= interval) {
-          previousMillis = millis();
-          BufferWriter writer;
-          writer.writeU16(15);
-          writer.writeU16(12);
-          writer.writeU16(20);
-          writer.writeU64(128);
-          send_packet(ClientPacket::ReportSensors, writer.getSize(), writer.getBuffer()); 
-          BufferWriter writerr;
-          writerr.writeU64(128);
-          uint8_t a[128];
-          writerr.writeBytes(a, 128);
-          send_packet(ClientPacket::ImageFrame, writerr.getSize(), writerr.getBuffer()); 
-        }
-      if (client.available()) {
-        receive_packet();
-      }
+      client_loop();
     }
   } else if (wifiTimeout < 3 && data.wifi) {
     Serial << "Connecting to wifi. retry count: " << wifiTimeout << endl;

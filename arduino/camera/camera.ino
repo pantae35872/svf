@@ -46,8 +46,8 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_RGB565; 
-  config.frame_size = FRAMESIZE_QVGA;
+  config.pixel_format = PIXFORMAT_JPEG; 
+  config.frame_size = FRAMESIZE_UXGA;
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
@@ -67,25 +67,21 @@ void loop() {
     Serial.write(magic_bytes, 4);
     size_t length = fb->len;
     uint8_t length_bytes[4];
-    uint8_t *jpg_buf = NULL;
-    size_t jpg_len = 0;
-    frame2jpg(fb, 12, &jpg_buf, &jpg_len);
-    length_bytes[0] = (jpg_len >> 24) & 0xFF;
-    length_bytes[1] = (jpg_len >> 16) & 0xFF;
-    length_bytes[2] = (jpg_len >> 8) & 0xFF;
-    length_bytes[3] = jpg_len & 0xFF;
+    length_bytes[0] = (length >> 24) & 0xFF;
+    length_bytes[1] = (length >> 16) & 0xFF;
+    length_bytes[2] = (length >> 8) & 0xFF;
+    length_bytes[3] = length & 0xFF;
     Serial.write(length_bytes, 4);
     size_t write_pos = 0;
     size_t write_count = 128;
-    while (write_pos < jpg_len) {
-      if (jpg_len - write_pos < 128) {
-        write_count = jpg_len - write_pos;
+    while (write_pos < length) {
+      if (length - write_pos < 128) {
+        write_count = length - write_pos;
       }
-      size_t wrote = Serial.write(jpg_buf+write_pos, write_count);
+      size_t wrote = Serial.write(fb->buf+write_pos, write_count);
       write_pos += wrote;
-      delay(1);
+      delay(80);
     }
     esp_camera_fb_return(fb);
-    free(jpg_buf);
   }
 }
