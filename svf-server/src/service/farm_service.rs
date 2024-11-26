@@ -45,7 +45,6 @@ pub enum ServiceRequest {
         access_token: [char; 128],
         device_id: [char; 64],
     },
-    Image,
     ReceiverCommand(ClientReceiverCommand),
 }
 
@@ -150,7 +149,7 @@ impl Service {
         client
             .sender
             .send(ServerPacket::UpdateCooler {
-                status: (air_temperature as i32) < client.target_temperature,
+                status: (air_temperature as i32) > client.target_temperature,
             })
             .await
             .unwrap();
@@ -244,7 +243,6 @@ impl super::Service<ServiceRequest, Result<ServiceResponse, ServiceError>> for S
                 access_token,
                 device_id,
             } => Ok(ServiceResponse::Empty),
-            ServiceRequest::Image => self.get_image().await,
             ServiceRequest::ReceiverCommand(command) => {
                 self.process_command(command).await;
                 return Ok(ServiceResponse::Empty);

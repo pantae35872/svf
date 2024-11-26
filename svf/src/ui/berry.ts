@@ -24,6 +24,34 @@ async function get_response(response_characteristic: BluetoothRemoteGATTCharacte
   return JSON.parse(message);
 }
 
+async function get_region(): Promise<{ region: string | null }> {
+  const region = await Swal.fire({
+    title: "Enter the region of your strawberry",
+    input: "text",
+    confirmButtonText: "Continue",
+    color: "var(--fg-color)",
+    background: "var(--bg-color-4)",
+    confirmButtonColor: "var(--bg-color-3)",
+    customClass: {
+      input: 'alert-input-style',
+      confirmButton: 'confirm-button-style',
+      cancelButton: 'cancel-button-style',
+    },
+    inputAttributes: {
+      autocapitalize: "off",
+    },
+    allowOutsideClick: false,
+  });
+
+  if (typeof (region.value) == 'string') {
+    return {
+      region: region.value,
+    };
+  }
+
+  return { region: null };
+}
+
 
 async function get_ssid_password(): Promise<{ ssid: string | null, password: string | null }> {
   const ssid = await Swal.fire({
@@ -116,13 +144,14 @@ export async function request_berry(server_addr: string): Promise<string | null>
       });
       const device_res: { need_id: boolean } = await get_response(response_characteristic);
       if (device_res.need_id) {
+        const { region } = await get_region();
         const res = await fetch(`${server_addr}/app/request-id`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            region: "japan",
+            region: region,
           }),
           credentials: 'include',
         });
