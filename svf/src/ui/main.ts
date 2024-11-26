@@ -7,7 +7,7 @@ import VueCookies from 'vue-cookies';
 
 const app = createApp(App);
 
-app.config.globalProperties.$server = process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:3000' : 'https://svf-backend.duckdns.org';
+app.config.globalProperties.$server = /*process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:3000' */ 'https://svf-backend.duckdns.org';
 
 app.use(router);
 app.use(vue3GoogleLogin, {
